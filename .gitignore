@@ -1,4 +1,4 @@
-*.pdf
+/literature
 /.quarto/
 *.csv
 *.xlsx

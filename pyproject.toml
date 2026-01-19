@@ -1,0 +1,23 @@
+[project]
+name = "bse-causal-inference-ml"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "causaldata>=0.1.5",
+    "ipykernel>=6.30.1",
+    "jupyter>=1.1.1",
+    "linearmodels>=7.0",
+    "matplotlib>=3.10.6",
+    "numpy>=2.3.3",
+    "pandas>=2.3.2",
+    "plotly>=6.3.0",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.7.2",
+    "scipy>=1.16.2",
+    "seaborn>=0.13.2",
+    "stargazer>=0.0.7",
+    "statsmodels>=0.14.5",
+    "wooldridge>=0.4.5",
+]

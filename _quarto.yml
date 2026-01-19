@@ -1,0 +1,30 @@
+project:
+  type: default
+
+format:
+  revealjs:
+    title-slide: false
+    theme: [simple, custom.scss]
+    self-contained: true
+    slide-number: true
+    transition: none
+    center: true
+    navigation-mode: linear
+    width: 1280
+    height: 720
+    footer: "Barcelona School of Economics"
+    highlight-style: dracula #breezeDark
+    code-line-numbers: true
+    code-copy: true
+
+  pdf:
+    format: revealjs
+    pdf-separate-fragments: false
+    pdf-max-pages-per-slide: 1
+    margin: 0.06
+
+editor:
+  render-on-save: true
+
+execute:
+  python: /Users/luciasauer/Desktop/causal_inference_ml_ta/bse_causal_inference_ml/.venv/bin/python3

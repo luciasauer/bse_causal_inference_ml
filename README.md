@@ -24,7 +24,7 @@ Welcome to the repository for the **Teaching Assistant (TA) sessions** of *Causa
 Each TA session has its own folder that includes:
 
 - `slides/` → PDF or Reveal.js slides.  
-- `code/`   → Stata .do file, Jupyter or R notebooks with code examples.  
+- `code/`   → Stata .do file or Jupyter notebooks with code examples.  
 - `datasets/` → Data for exercises.    
 
 ---

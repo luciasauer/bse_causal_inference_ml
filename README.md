@@ -34,8 +34,8 @@ Each TA session has its own folder that includes:
 
 We’ll be working with:
 
+- **Stata** 
 - **Python (pandas, statsmodels, linearmodels, matplotlib)**  
-- **Stata** (for selected exercises)  
 
 > 💡 **Tip:** Choose whichever language you feel most comfortable with. Parallel examples will be provided when possible.
 

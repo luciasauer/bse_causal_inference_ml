@@ -1,2 +1,5 @@
 *.pdf
 /.quarto/
+*.csv
+*.xlsx
+*.lock

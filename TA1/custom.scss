@@ -1,0 +1,255 @@
+/*-- scss:defaults --*/
+
+/* Paleta tipo LaTeX/Beamer */
+$blue-title: #1f3a93;
+$blue-box:   #1f3a93;
+$text-color: #111111;
+/*Global background color*/
+$global-background: #fffff8;
+
+/* Tipografías */
+$presentation-font-size-root: 32px; // base general
+$presentation-heading-font: "Latin Modern Roman", "Computer Modern Serif", "STIX Two Text", "Times New Roman", serif;
+$presentation-font: "Latin Modern Roman", "Computer Modern Serif", "STIX Two Text", "Times New Roman", serif;
+
+
+/*-- scss:rules --*/
+
+/* Fondo global para todas las slides */
+.reveal {
+  background-color: $global-background;
+}
+
+.reveal .slides section {
+  background-color: $global-background;
+}
+
+.reveal {
+  font-family: $presentation-font;
+  color: $text-color;
+}
+
+/* Títulos */
+.reveal h1, .reveal h2, .reveal h3 {
+  color: $blue-title;
+  font-family: $presentation-heading-font;
+  font-weight: 500;
+}
+
+/* Aire tipo LaTeX */
+.reveal section {
+  line-height: 1.25;
+}
+
+.reveal p, .reveal li {
+  font-size: 30px;   /* ajustá si querés */
+  line-height: 1.22;
+}
+
+/* Slide de título */
+.reveal .title-slide h1 {
+  font-size: 72px;
+  margin-bottom: 24px;
+}
+.reveal .title-slide h2 {
+  font-size: 40px;
+  margin-top: 8px;
+}
+.reveal .title-slide p {
+  font-size: 30px;
+}
+
+/* Carátula */
+.reveal .title-slide h1 {
+  font-size: 72px;
+  margin-bottom: 28px;
+}
+
+.reveal .title-slide h2 {
+  font-size: 40px;
+  font-weight: 400;
+  margin-top: 12px;
+}
+
+.reveal .title-slide p {
+  font-size: 30px;
+  margin-top: 18px;
+}
+
+/* Centrar la carátula manual */
+.title-slide-custom {
+  text-align: center;
+}
+.title-slide-custom > * {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- Footer: centrado, tamaño “institucional”, bien alineado --- */
+.reveal .slide-footer,
+.reveal .footer {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 14px !important;         /* subilo/bajalo */
+  width: 100% !important;
+  text-align: center !important;
+
+  font-size: 18px !important;      /* más legible */
+  line-height: 1.1 !important;
+  color: #777 !important;
+  opacity: 0.9 !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  z-index: 30 !important;
+  pointer-events: none;            /* no molesta al click */
+}
+
+/* Asegura que cualquier <p> dentro no herede 30px */
+.reveal .slide-footer p,
+.reveal .footer p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+
+
+
+/* Número de slide */
+.reveal .slide-number {
+  font-size: 18px;
+  color: #222;
+  background: transparent;
+}
+
+/* Caja azul */
+.box-blue {
+  border: 4px solid $blue-box;
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-top: 18px;
+
+  /* NUEVO: fondo celeste claro */
+  background-color: #f2f6ff;
+}
+
+
+.box-blue .box-title {
+  color: $blue-title;
+  font-size: 38px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Bullets azules */
+.reveal ul li::marker {
+  color: $blue-title;
+}
+
+
+/* ===== Carátula estilo Beamer académico ===== */
+
+.title-main {
+  color: $blue-title;
+  font-size: 72px;
+  font-weight: 500;
+}
+
+/* TA Session: mismo azul, NO bold */
+.title-ta {
+  color: $blue-title;
+  font-size: 40px;
+  font-weight: 400;
+  margin-top: 18px;
+}
+
+/* Programa */
+.title-program {
+  font-size: 30px;
+  color: #111;
+  margin-top: 18px;
+  font-style: italic;
+}
+
+/* Autor */
+.title-author {
+  font-size: 30px;
+  color: #111;
+  margin-top: 18px;
+}
+
+/* Fecha */
+.title-date {
+  font-size: 28px;
+  color: #111;
+  margin-top: 14px;
+}
+
+
+/* Mejoras específicas para PDF (print desde reveal) */
+@media print {
+  .reveal {
+    font-size: 28px;
+  }
+
+  .reveal,
+  .reveal .slides section {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .box-blue, pre, code, blockquote, table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a {
+    text-decoration: none !important;
+  }
+}
+
+
+@media print {
+  html, body,
+  .reveal-viewport,
+  .reveal,
+  .reveal .slides section {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: $global-background !important;
+  }
+}
+
+/* --- Rounded code block enhancements --- */
+/* Increase rounding, padding and ensure highlight box follows radius */
+.reveal pre, .reveal code, .reveal .sourceCode {
+  border-radius: 18px !important;
+  padding: 16px !important;
+  overflow: auto;
+  background-clip: padding-box; /* ensures background & border-radius behave */
+}
+
+.reveal .hljs {
+  border-radius: 14px !important;
+  background: transparent !important; /* let outer pre/code bg show */
+}
+
+/* Slightly larger monospace for readability inside slides */
+.reveal pre, .reveal code {
+  font-size: 20px;
+  font-family: "Fira Code", "Source Code Pro", Menlo, monospace;
+  line-height: 1.45;
+}
+
+/* Fondo global real (viewport completo) */
+html, body,
+.reveal-viewport,
+.reveal,
+.reveal .slides,
+.reveal .slides section {
+  background: $global-background !important;
+}

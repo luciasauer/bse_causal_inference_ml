@@ -1,0 +1,58 @@
+---
+format:
+  revealjs:
+    title-slide: false
+---
+
+<section class="title-slide-custom">
+<div class="title-main">Causal Inference & ML</div>
+<div class="title-ta">TA Session 1</div>
+<div class="title-program">Data Science for Decision Making</div>
+<div class="title-author">Lucia Sauer</div>
+<div class="title-date">2026-01-30</div>
+</section>
+
+---
+
+## Outline
+
+- Panel Datasets
+- Panel Data Models
+- Fixed Effects vs Random Effects
+- Hausman Test
+
+---
+
+## Corollary
+
+For any gamble in , there is some probability  such that.
+
+::: {.box-blue}
+<div class="box-title">Example 1</div>
+
+
+- bla bla bla
+- bla2 bla2 $\alpha$ bla2
+:::
+
+---
+
+## Python
+
+```{python}
+#| echo: true
+import pandas as pd
+import numpy as np
+import linearmodels as lm
+
+data = pd.DataFrame({
+    'entity': np.repeat(np.arange(1, 6), 4),
+    'time': list(np.arange(2000, 2004)) * 5,
+    'y': np.random.randn(20),
+    'x1': np.random.randn(20),
+    'x2': np.random.randn(20)
+})
+data.head(5)
+
+```
+

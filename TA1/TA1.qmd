@@ -12,47 +12,1107 @@ format:
 <div class="title-date">2026-01-30</div>
 </section>
 
----
-
-## Outline
-
-- Panel Datasets
-- Panel Data Models
-- Fixed Effects vs Random Effects
-- Hausman Test
-
----
-
-## Corollary
-
-For any gamble in , there is some probability  such that.
-
-::: {.box-blue}
-<div class="box-title">Example 1</div>
 
 
-- bla bla bla
-- bla2 bla2 $\alpha$ bla2
+# TA Materials:
+
+All the material for TA Sessions — slides, and code will be hosted in the [GitHub repository](https://github.com/luciasauer/bse_causal_inference_ml).
+
+
+```bash
+git clone https://github.com/luciasauer/bse_causal_inference_ml.git
+```
+The TA sessions will mainly focus on **Stata**, but some examples in **Python** will also be provided. 
+
+📦 Ensure that the required Python packages are installed:
+
+
+Install uv
+
+```bash
+uv sync
+```
+
+Pull the repository and get the updated materials for each session.
+
+
+
+# Outline
+
+:::incremental
+- Panel Data
+- Why Panel Data?
+- Static and Linear Models
+    - Pooled OLS
+    - Fixed Effects Models
+    - Random Effects Models
+    - Hausman Test
+- Dynamic Panel Data Models
+    - Arellano-Bond Estimator
+
 :::
 
+
+# What panel data looks like…
+
+- Panel data consists of observations on multiple entities over multiple time periods.
+- Each entity is observed at several time points, allowing us to analyze changes over time within the same entities.
+
+
+| Entity ID | Time Period | Income    | gender |
+|-----------|-------------|------------|------------|
+| 1         | 2000        | 30        | male        |
+| 1         | 2001        | 33        | male        |
+| 1         | 2002        | 33        | male        |
+| 2         | 2000        | 50        | female      |
+| 2         | 2001        | 58        | female      |
+| 2         | 2002        | 61        | female      |
+| 3         | 2000        | 25        | female      |
+| 3         | 2001        | 30        | female      |
+| 3         | 2002        | 42        | female      |
+
+
 ---
 
-## Python
+## Wide Format Panel Data
+
+- In practice, datasets such as those from the World Bank are typically organized in **wide format.**
+
+- To perform panel data analysis, we first reshape the data into **long format**, so that each row corresponds to a specific entity and time period.
 
 ```{python}
-#| echo: true
+#|echo: false
+#|eval: true
+import numpy as np
+import pandas as pd
+
+# -------------------------
+# 1) WIDE DATASET
+# -------------------------
+np.random.seed(7)
+
+countries = list("ABCDEFG")              # countries A..G
+years = list(range(2000, 2006))          # 2000..2005
+
+# Base level by country (to show heterogeneity)
+base_by_country = {c: np.random.uniform(2000, 30000) for c in countries}
+    
+# Common trend by year (to show temporal evolution)
+trend_by_year = {y: 1 + 0.03*(y - years[0]) for y in years}  # +3% annual approx.
+wide = pd.DataFrame({"Country": countries})
+
+for y in years:
+    noise = np.random.normal(loc=0, scale=500, size=len(countries))
+    wide[str(y)] = [
+        base_by_country[c] * trend_by_year[y] + noise[i]
+        for i, c in enumerate(countries)
+    ]
+
+# round to 2 decimals
+wide[ [str(y) for y in years] ] = wide[ [str(y) for y in years] ].round(2)
+```
+
+```{python}
+#|echo: false
+#|eval: true
+wide.head(6)
+```
+
+---
+
+## Long Format Panel Data
+
+Stata use the command `reshape` to convert wide format data to long format:
+
+```stata
+gen id = _n
+order id 
+reshape long x , i(id) j(year)
+```
+
+In Python we can use the `melt` function in pandas:
+
+```{python}
+#|echo: true
+#|eval: true
+#| fontsize: scriptsize
+long = (
+    wide.melt("Country", var_name="year", value_name="gdp")
+        .assign(year=lambda d: d.year.astype(int))
+)
+long = long.sort_values(["Country", "year"])
+```
+
+```{python}
+#|echo: false
+#|eval: true
+long.head(4)
+```
+
+# Types of Panel Data
+
+```{python}
+#|echo: false
 import pandas as pd
 import numpy as np
-import linearmodels as lm
 
-data = pd.DataFrame({
-    'entity': np.repeat(np.arange(1, 6), 4),
-    'time': list(np.arange(2000, 2004)) * 5,
-    'y': np.random.randn(20),
-    'x1': np.random.randn(20),
-    'x2': np.random.randn(20)
+#generate balanced panel data for 30 observations, during 3 time periods 
+np.random.seed(42)
+n_entities = 30
+n_periods = 10
+entity_ids = np.arange(1, n_entities + 1)
+time_periods = np.arange(2000, 2000 + n_periods)
+data_balanced = pd.DataFrame({
+    'Entity_ID': np.repeat(entity_ids, n_periods),
+    'Time_Period': np.tile(time_periods, n_entities),
+    'Income': np.random.randint(20, 100, size=n_entities * n_periods)
 })
-data.head(5)
+
+#now generates unbalanced panel data by randomly dropping some observations
+drop_indices = np.random.choice(data_balanced.index, size=20, replace=False)
+data_unbalanced = data_balanced.drop(drop_indices).reset_index(drop=True)
 
 ```
 
+
+
+```{python}
+#|echo: false
+#|eval: true
+#| fig-align: center
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import seaborn as sns
+from matplotlib.patches import Patch
+
+sns.set(style="whitegrid", context="talk")
+
+def make_presence_matrix(df, id_col="Entity_ID", t_col="Time_Period"):
+    ids = np.sort(df[id_col].unique())
+    times = np.sort(df[t_col].unique())
+
+    mat = (
+        df.assign(present=1)
+          .pivot_table(index=id_col, columns=t_col, values="present", fill_value=0)
+          .reindex(index=ids, columns=times, fill_value=0)
+    )
+    return mat
+
+def panelview_style(ax, mat, title, show_ylabels=True):
+    A = mat.to_numpy().astype(int)  # ensure 0/1
+
+    cmap = mcolors.ListedColormap(["#cc95cf", "#8f4294"])  # missing, present
+    norm = mcolors.BoundaryNorm([-0.5, 0.5, 1.5], cmap.N)
+
+    ax.imshow(A, aspect="auto", interpolation="none", cmap=cmap, norm=norm)
+
+    ax.set_title(title)
+    ax.set_xlabel("")
+    ax.set_ylabel("Entity" if show_ylabels else "")
+
+    # x ticks at centers of cells
+    ax.set_xticks(np.arange(mat.shape[1]))
+    ax.set_xticklabels(mat.columns, rotation=45, ha="right")
+
+    # y ticks (optional)
+    if show_ylabels and mat.shape[0] <= 15:
+        ax.set_yticks(np.arange(mat.shape[0]))
+        ax.set_yticklabels(mat.index)
+    else:
+        ax.set_yticks([])
+
+    # grid lines at cell boundaries (panelview look)
+    ax.set_xticks(np.arange(-0.5, mat.shape[1], 1), minor=True)
+  
+    ax.set_yticks(np.arange(-0.5, mat.shape[0], 1), minor=True)
+    ax.grid(which="minor", linewidth=0.8)
+    ax.tick_params(which="minor", bottom=False, left=False)
+   
+
+# Plot side-by-side
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+
+# Build matrices
+balanced_mat = make_presence_matrix(data_balanced)
+unbalanced_mat = make_presence_matrix(data_unbalanced)
+
+panelview_style(axes[0], balanced_mat, "Balanced panel", show_ylabels=True)
+panelview_style(axes[1], unbalanced_mat, "Unbalanced panel", show_ylabels=False)
+
+from matplotlib.patches import Patch
+
+legend_elements = [
+    Patch(facecolor="#8f4294", edgecolor="k", label="Observed"),
+    Patch(facecolor="#cc95cf", edgecolor="k", label="Missing")
+]
+
+fig.legend(
+    handles=legend_elements,
+    loc="lower center",
+    ncol=2,
+    frameon=False,
+    bbox_to_anchor=(0.5, -0.05),
+    fontsize=18
+)
+
+plt.tight_layout()
+plt.show()
+
+```
+
+Usefull package in R to plot panel data structure: `panelview`
+
+# Types of Panel Data
+
+Micro panels: Large $N=50$, Small $T=10$
+
+```{python}
+#| echo: false
+#| eval: true
+#| fig-align: center
+
+def make_presence_matrix(df, id_col="Entity_ID", t_col="Time_Period"):
+    return (
+        df.assign(present=1)
+          .pivot_table(index=id_col, columns=t_col, values="present", fill_value=0)
+    )
+
+def plot_panel(mat, title, max_xticks=8, figsize=(5, 4), show_cell_grid=True):
+    A = mat.to_numpy().astype(int)
+    N, T = A.shape
+    
+    cmap = mcolors.ListedColormap(["#f2e6f3", "#8f4294"])
+    norm = mcolors.BoundaryNorm([-0.5, 0.5, 1.5], cmap.N)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.imshow(A, cmap=cmap, norm=norm, interpolation="nearest", aspect="auto")
+
+    ax.set_title(title, pad=10)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Entity")
+    ax.set_yticks([])
+
+    # --- X ticks: micro = todos + rotados, macro = cada 5 ---
+    if T <= 12:  # MICRO
+        xticks = np.arange(T)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(mat.columns.astype(str), rotation=45, ha="right")
+    else:        # MACRO
+        step = 5
+        xticks = np.arange(0, T, step)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(mat.columns[::step].astype(str), rotation=0)
+
+    # --- GRID EXACTA EN BORDES DE CELDAS ---
+    if show_cell_grid:
+        ax.set_xticks(np.arange(-0.5, T, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, N, 1), minor=True)
+
+        if T > 30:
+            ax.grid(which="minor", axis="y", linewidth=0.6, color="white")
+        else:
+            ax.grid(which="minor", linewidth=0.6, color="white")
+
+        ax.tick_params(which="minor", bottom=False, left=False)
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ---- Micro panel data ----
+np.random.seed(42)
+
+data_micro = pd.DataFrame({
+    "Entity_ID": np.repeat(np.arange(1, 51), 10),      # large N
+    "Time_Period": np.tile(np.arange(2000, 2010), 50) # small T
+})
+
+micro_mat = make_presence_matrix(data_micro)
+plot_panel(micro_mat, "Micro Panel",
+           figsize=(4.2, 7.2), max_xticks=10, show_cell_grid=True)
+
+```
+
+
+# Types of Panel Data
+
+Macro panels: small $N=10$ and large $T=50$
+
+```{python}
+#| fig-align: center
+# ---- Macro panel data ----
+np.random.seed(42)
+data_macro = pd.DataFrame({
+    "Entity_ID": np.repeat(np.arange(1, 11), 50),      # small N
+    "Time_Period": np.tile(np.arange(2000, 2050), 10) # large T
+})
+
+macro_mat = make_presence_matrix(data_macro)
+plot_panel(macro_mat, "Macro Panel",
+           figsize=(8, 2.6), max_xticks=8, show_cell_grid=True)
+
+
+```
+
+# Why Panel Data?
+
+
+::: {.box-blue}
+<div class="box-title">The problem</div>
+
+OLS requires exogeneity: $E(u_{it} \mid X_{it}) = 0$
+
+When unobserved factors $(c_i)$ affect $(y_{it})$ and are correlated with $(X_{it})$,
+$$\text{Cov}(X_{it}, c_i) \neq 0$$
+OLS suffers from **Omitted Variable Bias**.
+:::
+
+
+<div style="margin-top: 2em;"></div>
+
+::: columns
+::: column
+- **With a single cross section**, some remedies are Instrumental Variables (IV)
+- **With panel data**, we can control for **time-invariant unobserved heterogeneity**
+:::
+::: column
+<div style="text-align: center;">
+  <img src="figures/ovb.svg" width="50%">
+</div>
+:::
+:::
+
+
+
+
+# Panel Data Models
+
+Throughout this session, we focus on **panel data models** designed to handle
+unobserved heterogeneity and dynamic behavior over time.
+
+
+<span class="fragment" style="color:#1f3a93; font-weight:600;">
+1. Static Linear Panel Models
+</span>
+
+<ul>
+<li class="fragment"><b>Pooled OLS</b> — Ignores unobserved heterogeneity</li>
+<li class="fragment"><b>Fixed Effects (FE)</b> — Allows $\text{Cov}(c_i, X_{it}) \neq 0$</li>
+<li class="fragment"><b>Random Effects (RE)</b> — Requires $\text{Cov}(c_i, X_{it}) = 0$</li>
+</ul>
+
+<span class="fragment" style="color:#1f3a93; font-weight:600;">
+2. Dynamic Panel Models
+</span>
+
+<ul>
+<li class="fragment">Arellano–Bond (Difference GMM)</li>
+<li class="fragment">System GMM</li>
+</ul>
+
+<p class="fragment">
+Used when the model includes <b>lagged dependent variables</b> and standard FE is biased.
+</p>
+
+
+
+
+# 1. Static and Linear Models
+
+## The Grunfeld Investment Data
+
+We use the classic [**Grunfeld (1958)**](https://www.stata-press.com/data/r18/grunfeld.dta) dataset, which contains annual data on 10 large US manufacturing firms from 1935 to 1954. 
+
+To access the data in Stata, use:
+
+```stata
+webuse grunfeld, clear
+```
+
+In Python:
+```{python}
+#| echo: true
+#| eval: true
+grunfeld = pd.read_stata("data/grunfeld.dta")
+grunfeld.head(5)
+```
+
+## The model
+
+We want to model the investment behavior of firms over time:
+$$invest_{it} = \beta_0 + \beta_1 mvalue_{i,t-1} + \beta_2 kstock_{i,t-1} + c_i + \varepsilon_{it}$$
+
+
+- $invest_{it}$:  Investment (current year)
+- $mvalue_{i,t-1}$: Market value of the firm (end of previous year)
+- $kstock_{i,t-1}$: Capital stock (end of previous year)
+- $c_i$: Unobserved time-invariant firm-specific heterogeneity (e.g., management quality, corporate culture, industry position).
+
+::: {.box-blue}
+<div class="box-title">Research question</div>
+How do market value and capital stock affect firm investment?
+:::
+
+## Setting Up the Panel Structure
+
+In Stata, we declare the panel structure using the `xtset` command:
+
+```stata
+xtset company year
+```
+<div style="margin-top: 0.6em;"></div>
+
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.6em; padding:1em; border-radius:18px;">
+Panel variable: company (strongly balanced)
+ Time variable: year, 1935 to 1954
+         Delta: 1 year
+</pre>
+```
+<div style="margin-top: 0.6em;"></div>
+
+<span style="color:#1f3a93; font-weight:600;">Interpretation</span>: we have a *strongly balanced* panel --- all 10 firms are observed in all 20 years, giving us $N = 10 \times 20 = 200$ observations.
+
+<div style="margin-top: 0.6em;"></div>
+
+In Python, we can set the index to be a MultiIndex with company and year:
+```{python}
+#| echo: true
+#| eval: true
+grunfeld = grunfeld.set_index(['company', 'year'])
+```
+
+## Descriptive Statistics
+
+In Stata we can explore pooled summary statistics with the `summarize` command:
+
+```stata
+summarize invest mvalue kstock
+```
+<div style="margin-top: 0.6em;"></div>
+
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:1em; border-radius:18px;">
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      invest |        200    145.9583    216.8753        .93     1486.7
+      mvalue |        200    1081.681     1314.47      58.12     6241.7
+      kstock |        200    276.0172    301.1039         .8     2226.3
+</pre>
+```
+<div style="margin-top: 0.6em;"></div>
+In Python, we can compute the same summary statistics using the `describe` method:
+```{python}
+#| echo: true
+#| eval: true
+grunfeld.reset_index()[['invest', 'mvalue', 'kstock']].describe()
+```
+
+
+## Sources of variation in Panel Data
+
+A key feature of panel data is that variation comes from 2 sources: 
+
+$$\text{between} = \bar{Y}_{i} - \bar{Y} \quad \text{and} \quad \text{within} = Y_{it} - \bar{Y}_i$$
+
+Simplified example with only 3 firms over 3 years:
+
+<table>
+<thead>
+<tr>
+<th>company</th><th>year</th><th>$invest_{it}$</th><th>$\bar{invest}_i$</th>
+<th>$invest_{it}-\bar{invest}$</th>
+<th><b>$invest_{it}-\bar{invest}_i$</b></th>
+<th>$\bar{invest}_i-\bar{invest}$</th>
+</tr>
+</thead>
+<tbody>
+
+<tr><td>1</td><td>1935</td><td>317.6</td><td>373.33</td><td>60.89</td><td><b>−55.73</b></td><td>116.62</td></tr>
+<tr><td>1</td><td>1936</td><td>391.8</td><td>373.33</td><td>135.09</td><td><b>18.47</b></td><td>116.62</td></tr>
+<tr><td>1</td><td>1937</td><td>410.6</td><td>373.33</td><td>153.89</td><td><b>37.27</b></td><td>116.62</td></tr>
+
+<tr><td>2</td><td>1935</td><td>209.9</td><td>345.03</td><td>−46.81</td><td><b>−135.13</b></td><td>88.32</td></tr>
+<tr><td>2</td><td>1936</td><td>355.3</td><td>345.03</td><td>98.59</td><td><b>10.27</b></td><td>88.32</td></tr>
+<tr><td>2</td><td>1937</td><td>469.9</td><td>345.03</td><td>213.19</td><td><b>124.87</b></td><td>88.32</td></tr>
+
+<tr><td>3</td><td>1935</td><td>33.1</td><td>51.77</td><td>−223.61</td><td><b>−18.67</b></td><td>−204.94</td></tr>
+<tr><td>3</td><td>1936</td><td>45.0</td><td>51.77</td><td>−211.71</td><td><b>−6.77</b></td><td>−204.94</td></tr>
+<tr><td>3</td><td>1937</td><td>77.2</td><td>51.77</td><td>−179.51</td><td><b>25.43</b></td><td>−204.94</td></tr>
+
+</tbody>
+</table>
+
+
+
+## Within and Between Variation
+
+This can be summarized using the `xtsum` command in Stata:
+
+```stata
+xtsum invest mvalue kstock
+```
+<div style="margin-top: 0.6em;"></div>
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:1em; border-radius:18px;">
+Variable         |      Mean   Std. dev.       Min        Max |    Observations
+-----------------+--------------------------------------------+----------------
+invest   overall |  145.9583   216.8753        .93     1486.7 |     N =     200
+         between |             198.8242     3.0845     608.02 |     n =      10
+         within  |             106.1986  -204.3617   1024.638 |     T =      20
+                 |                                            |
+mvalue   overall |  1081.681    1314.47      58.12     6241.7 |     N =     200
+         between |             1334.917     70.921   4333.845 |     n =      10
+         within  |             340.5421   -459.964   2989.536 |     T =      20
+                 |                                            |
+kstock   overall |  276.0172   301.1039         .8     2226.3 |     N =     200
+         between |             200.9701     5.9415    648.435 |     n =      10
+         within  |             232.6603  -369.6179   1853.882 |     T =      20
+</pre>
+```
+
+<span style="color:#1f3a93; font-weight:600;">Interpretation</span>:
+
+- For $invest$: between-firm SD (198) $>$ within-firm SD (106). Most variation is across firms, not within firms over time.
+- This suggests that firm-specific characteristics (captured by $c_i$) are important.
+- Fixed effects will exploit only the within variation; random effects uses both.
+
+
+## Estimation Methods - Pooled OLS
+
+
+::: {.box-blue}
+
+<div class="box-title">First Case</div>
+
+- Pooled OLS ignores unobserved heterogeneity and pools all observations together.
+- It assumes that $c_i = c \quad \text{is constant}$
+- If $c_i$ is correlated with $mvalue$ or $kstock$, estimates are **biased**.
+:::
+
+<div style="margin-top: 0.6em;"></div>
+
+In Stata, we can estimate the pooled OLS model using the `reg` command with robust standard errors because of potential heteroskedasticity:
+
+```stata
+reg invest mvalue kstock, robust
+```
+<div style="margin-top: 0.3em;"></div>
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:1em; border-radius:18px;">
+Linear regression                               Number of obs     =        200
+                                                F(2, 197)         =     178.83
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.8124
+                                                Root MSE          =     94.408
+------------------------------------------------------------------------------
+             |               Robust
+      invest | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      mvalue |   .1155622    .006811    16.97   0.000     .1021304    .1289939
+      kstock |   .2306785   .0488655     4.72   0.000     .1343118    .3270452
+       _cons |  -42.71437    11.5747    -3.69   0.000    -65.54059   -19.88815
+------------------------------------------------------------------------------
+</pre>
+```
+
+## Estimation Methods - Fixed Effects (Within Estimator)
+
+1. We start from the panel data model:
+
+$$invest_{it} = c_i + \beta_1 mvalue_{i,t-1}+ \beta_2 kstock_{i,t-1} + \varepsilon_{it}$$
+
+where we allow for $c_i$ to be correlated with $mvalue$ and $kstock$, random and unobserved.
+
+2. Fixed Effects removes $c_i$ by comparing each unit **to itself over time**.
+
+$$invest_{it} - \bar{invest}_i = \beta_1 (mvalue_{i,t-1} - \bar{mvalue}_i) + \beta_2 (kstock_{i,t-1} - \bar{kstock}_i) + (\varepsilon_{it} - \bar{\varepsilon}_i)$$
+
+3. Apply OLS to the demeaned variables.
+
+<div style="text-align: center;">
+  <img src="figures/fe_meme.png" width="30%">
+</div>
+
+
+## Estimation Methods - Fixed Effects (Within Estimator)
+
+All these steps are done automatically in Stata with the `xtreg, fe` command.
+
+```stata
+xtreg invest mvalue kstock, fe robust
+```
+
+Also if we want to estimate FE by Dummy Variable approach:
+
+
+```stata
+reg invest mvalue kstock i.company, vce(cluster company)
+```
+
+
+To implement FE - Within Estimator in Python, we can use the `linearmodels.panel` package:
+
+```{python}
+#| echo: true
+#| eval: false
+from linearmodels.panel import PanelOLS
+fe_model = PanelOLS.from_formula(
+    'invest ~ 1 + mvalue + kstock + EntityEffects',
+    data=grunfeld
+)
+fe_results = fe_model.fit(cov_type='clustered', cluster_entity=True)
+print(fe_results)
+```
+
+
+## Interpretation of Fixed Effects Results
+
+<div style="margin-top: 0.5em;"></div>
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:0.5em; border-radius:12px;">
+Fixed-effects (within) regression               Number of obs     =        200
+Group variable: company                         Number of groups  =         10
+
+R-squared:                                      Obs per group:
+     Within  = 0.7668                                         min =         20
+     Between = 0.8194                                         avg =       20.0
+     Overall = 0.8060                                         max =         20
+
+                                                F(2, 9)           =      28.31
+corr(u_i, Xb) = -0.1517                         Prob > F          =     0.0001
+
+                               (Std. err. adjusted for 10 clusters in company)
+------------------------------------------------------------------------------
+             |               Robust
+      invest | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      mvalue |   .1101238   .0151945     7.25   0.000     .0757515    .1444961
+      kstock |   .3100653   .0527518     5.88   0.000     .1907325    .4293981
+       _cons |  -58.74393   27.60286    -2.13   0.062    -121.1859    3.698079
+-------------+----------------------------------------------------------------
+     sigma_u |  85.732501
+     sigma_e |  52.767964
+         rho |  .72525012   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+</pre>
+```
+
+- $mvalue$: A $\$1$ million increase in market value is associated with a $\$0.11$ million increase in investment.
+- $kstock$: A $\$1$ million increase in capital stock is associated with a $\$0.31$ million increase in investment.
+- $\rho = 0.73$: $73\%$ of the total variance is due to differences *between* firms (unobserved heterogeneity).
+- $corr(u_i, Xb) = 0.46$: The firm effects are correlated with the regressors, justifying the use of FE over RE.
+
+## Estimation Methods - Random Effects Model
+
+```stata
+xtreg invest mvalue kstock, re robust
+```
+
+<div style="margin-top: 0.3em;"></div>
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:0.5em; border-radius:12px;">
+Random-effects GLS regression                   Number of obs     =        200
+Group variable: company                         Number of groups  =         10
+R-squared:                                      Obs per group:
+     Within  = 0.7668                                         min =         20
+     Between = 0.8196                                         avg =       20.0
+     Overall = 0.8061                                         max =         20
+                                                Wald chi2(2)      =      70.13
+corr(u_i, X) = 0 (assumed)                      Prob > chi2       =     0.0000
+
+                               (Std. err. adjusted for 10 clusters in company)
+------------------------------------------------------------------------------
+             |               Robust
+      invest | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      mvalue |   .1097811   .0137557     7.98   0.000     .0828206    .1367417
+      kstock |    .308113   .0549728     5.60   0.000     .2003683    .4158576
+       _cons |  -57.83441   24.84323    -2.33   0.020    -106.5262   -9.142576
+-------------+----------------------------------------------------------------
+     sigma_u |   84.20095
+     sigma_e |  52.767964
+         rho |  .71800838   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+</pre>
+```
+- RE assumes $\text{Cov}(c_i, X_{it}) = 0$. 
+- The Hausman test will help us choose between FE and RE.
+
+## Fixed Effects vs.\ Random Effects: The Hausman Test
+
+The Hausman test compares the FE and RE estimators. 
+
+$$\begin{aligned}
+H_0 &: \ \operatorname{Cov}(c_i, X_{it}) = 0 
+      && \text{(both estimators are consistent, RE is more efficient)} \\
+H_A &: \ \operatorname{Cov}(c_i, X_{it}) \neq 0 
+      && \text{(only FE is consistent)}
+\end{aligned}$$
+
+
+Statistic:
+
+$$H = (\hat{\beta}_{RE} - \hat{\beta}_{FE})' [\operatorname{Var}(\hat{\beta}_{FE}) - \operatorname{Var}(\hat{\beta}_{RE})]^{-1} (\hat{\beta}_{RE} - \hat{\beta}_{FE})$$
+
+This statistic follows a chi-squared distribution under the null hypothesis and RE1 - RE3.
+
+```{python}
+#| echo: false
+#| eval: true
+#| fig-align: center
+#| fig-width: 12
+#| fig-height: 6
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+df = 5
+alpha = 0.05
+
+# --- Chi-square pdf + critical value (with scipy if available) ---
+try:
+    from scipy.stats import chi2
+    xcrit = chi2.ppf(1 - alpha, df)
+    x = np.linspace(0, chi2.ppf(0.999, df), 600)
+    y = chi2.pdf(x, df)
+except Exception:
+    # Fallback (no scipy): pdf via gamma function; approximate xcrit via grid
+    from math import gamma, exp
+    def chi2_pdf(xx, k):
+        return (1/(2**(k/2)*gamma(k/2))) * (xx**(k/2-1)) * np.exp(-xx/2)
+
+    x = np.linspace(1e-6, 60, 600)
+    y = chi2_pdf(x, df)
+
+    # crude xcrit approximation: find x where CDF ~ 1-alpha (numerical integration)
+    cdf = np.cumsum(y) * (x[1] - x[0])
+    cdf = cdf / cdf[-1]
+    xcrit = x[np.searchsorted(cdf, 1 - alpha)]
+
+# --- Plot ---
+fig, ax = plt.subplots(figsize=(10, 5))
+
+ax.plot(x, y, linewidth=2, color="#1f3a93")
+ax.axvline(xcrit, linestyle="--", linewidth=1.8)
+
+# Make room below for labels/segments
+ymax = y.max()
+ax.set_ylim(-0.10 * ymax, 1.05 * ymax)
+
+# Baseline segments (acceptance vs rejection)
+ax.hlines(0, 0, xcrit, linewidth=3)
+ax.hlines(0, xcrit, x.max(), linewidth=3)
+
+# Labels
+ax.text(xcrit * 0.45, -0.07 * ymax, "Acceptance region", ha="center", va="top")
+ax.text(xcrit + (x.max() - xcrit) * 0.55, -0.07 * ymax, "Rejection region", ha="center", va="top")
+
+ax.set_ylabel("Density")
+ax.set_xlabel(r"$\chi^2$")
+
+# Annotation for critical value
+ax.annotate(rf"$\chi^2_{{{alpha}}}$",
+            xy=(xcrit, 0), xytext=(xcrit, -0.02 * ymax),
+            ha="center", va="top")
+
+# Clean look (like slides)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.set_yticks([])
+ax.set_xticks([])
+
+plt.tight_layout()
+plt.show()
+```
+
+- If $H$ is large, then there is a statistical difference between these two estimators, and we reject $H_0$ in favor of FE.
+- If $H$ is small, we fail to reject $H_0$ and prefer RE for efficiency.
+
+## The Hausman Test in Stata
+
+In Stata, we can perform the Hausman test with `hausman` command
+
+1. Estimate and store the FE model
+```stata
+quietly xtreg invest mvalue kstock, fe
+estimates store FE
+```
+2. Estimate and store the RE model
+```stata
+quietly xtreg invest mvalue kstock, re
+estimates store RE
+```
+3. Run the Hausman test
+```stata
+* Hausman test
+hausman FE RE, sigmamore
+```
+<!-- What does sigmamore do?
+It computes both variance matrices using the disturbance variance from the efficient estimator (RE), improving numerical stability of the Hausman test. -->
+
+- However, this test assumes homoskedasticity and no clustering. If these assumptions are violated, the standard Hausman test may be invalid.
+- In such cases, consider using robust or clustered versions of the Hausman test, with `xtoverid` command.
+- Nevertheless, FE is often preferred in practice due to is consistent whether or not $\text{Cov}(c_i, X_{it}) = 0$.
+
+## Clustered Standard Errors: Why and How
+
+In panel data, observations within the same entity (firm, country, individual) are typically **not independent**. This violates a key OLS assumption and causes problems:
+
+- **Heteroskedasticity**: Error variance may differ across entities
+- **Serial correlation**: Errors for the same entity are correlated over time
+
+For pooled OLS:
+
+```stata
+*Hetertoskedastic robust SE
+reg invest mvalue kstock, robust 
+
+* Cluster-robust: handles BOTH heteroskedasticity AND serial correlation
+reg invest mvalue kstock, vce(cluster company)
+```
+
+For FE and RE models:
+
+```stata
+*Hetertoskedastic robust SE
+xtreg invest mvalue kstock, fe robust 
+
+* Cluster-robust: handles BOTH heteroskedasticity AND serial correlation
+xtreg invest mvalue kstock, fe vce(cluster company)
+```
+
+Point estimates remain the same; only standard errors and inference change.
+
+## How many clusters are enough?
+
+Cluster-robust standard errors rely on asymptotic theory as the number of clusters $G \to \infty$. With few clusters:
+\begin{itemize}
+    \item Standard errors may be biased downward
+    \item Inference may be unreliable
+\end{itemize}
+
+- **$G \geq 50$** → generally safe  
+- **$20 \leq G < 50$** → use with caution  
+- **$G < 20$** → clustered SEs may be unreliable  
+
+👉 *Grunfeld data:* **$G = 10$ firms** $\rightarrow$ inference is fragile  
+
+**With few clusters:** use wild cluster bootstrap
+
+```stata
+* Wild cluster bootstrap (requires boottest package)
+ssc install boottest
+xtreg invest mvalue kstock, fe
+boottest mvalue, cluster(company) reps(999)
+```
+
+**Multiple clustering dimensions:** 
+
+The `reghdfe` command allows for multiple fixed effects and multi-way clustered standard errors in a computationally efficient way.
+
+```stata
+reghdfe invest mvalue kstock, absorb(company) vce(cluster company year)
+
+```
+
+## Adding Time Fixed Effects: Two-Way Fixed Effects
+
+There may be common shocks affecting all entities in a given time period (e.g., economic crises, policy changes). To control for these, we can include time fixed effects:
+
+```stata
+xtreg invest mvalue kstock i.year, fe robust
+```
+
+Testing for Time Fixed Effects
+
+```stata
+testparm i.year
+```
+
+<div style="margin-top: 0.5em;"></div>
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.4em; padding:0.5em; border-radius:12px;">
+
+F(  9,     9) =    6.15
+            Prob > F =    0.0062
+
+</pre>
+```
+
+**Interpretation:** The null hypothesis is significant at the $0.6\%$, meaning that year coefficients are jointly statistically significant. Time fixed effects are necessary for this dataset.
+
+<!-- ## Summary of Static Panel Data Models
+
+- FE is consistent whether or not $\text{Cov}(c_i, X_{it}) = 0$. *When in doubt, use FE.*
+- Use Random Effects only when:
+    - You need to estimate effects of time-invariant variables
+    - You have strong reasons to believe $c_i$ is uncorrelated with regressors
+    
+- Always cluster standard errors, there's no good reason not to cluster in panel data.
+```stata
+xtreg y x, fe vce(cluster panelid)
+```
+    
+- Use the robust Hausman test `xtoverid`, the standard Hausman test is invalid with heteroskedasticity.
+    
+- Test for time effects: Use `testparm i.year` after including year dummies.
+    
+- With few clusters ($< 20$): Consider wild cluster bootstrap for more reliable inference.
+    
+- Use `reghdfe` for:
+    - \item Multiple levels of fixed effects
+    - Large datasets
+    - Two-way clustering -->
+
+
+# 2. Dynamic Models
+
+
+## Introduction to Dynamic Panel Data Models
+
+In this section, we'll understand why lagged dependent variables break our usual toolkit and how GMM methods solve this problem.
+
+Follwoing Arellano and Bond (1991), we will estimate a dynamic labor demand model using use `abdata` dataset of UK firms from 1976 to 1984.
+
+**The model:**
+$$n_{it} = c_i + \rho \cdot n_{it-1} + X_{it}'\cdot \beta + \epsilon_{it}$$
+
+where: 
+
+- $n_{it}$: log employment
+- $\rho$: **persistence parameter** (key!)
+- $c_i$: firm fixed effect
+- $X_{it}$: wages, capital, output in log (current and lagged)
+
+
+
+# Ignoring Dynamic Panel Structure
+
+
+## Approach 1: Pooled OLS
+
+
+**Ignore panel structure, estimate:**
+$$n_{it} = c_i + \rho \cdot n_{it-1} + X_{it}'\cdot \beta + u_{it}$$
+
+```stata
+reg n nL1 nL2 w wL1 k kL1 kL2 ys ysL1 ysL2 yr*, cluster(id)
+```
+
+**Problem:** The composite error $u_{it} = c_i + \epsilon_{it}$ contains $c_i$ (productivity, management quality...)
+
+- If $c_i$ is correlated with $n_{it-1}$ $\rightarrow$ **OVB**
+- Typically: more productive firms $\rightarrow$ hire more $\rightarrow$ $Cov(n_{it-1}, c_i) > 0$
+- Result: $\hat{\rho}_{OLS}$ is **biased upward** ⬆️
+
+**$\hat{\rho} = 1.044$ (>1 !)** — Not plausible for a stationary series!
+
+## Approach 2: Random Effects
+
+**Assume $cov(c_i, X_{it}) = 0$:**
+
+```stata
+xtreg n nL1 nL2 w wL1 k kL1 kL2 ys ysL1 ysL2 yr*, re
+```
+
+**Problem: Same as OLS!**
+
+
+Even if $c_i$ were truly random (questionable!):
+
+- $n_{it-1}$ is mechanically correlated with $c_i$ 
+- Because $n_{it-1} = c_i + \rho n_{it-2} + \ldots$
+- RE estimator is **inconsistent**
+
+**$\hat{\rho} = 1.044$** — Same as pooled OLS!
+
+## Approach 3: Fixed Effects (Within) 
+
+**Demean to eliminate $c_i$:**
+$$n_{it} - \bar{n}_i = \rho(n_{it-1} - \bar{n}_i) + (X_{it} - \bar{X}_i)'\beta + (\epsilon_{it} - \bar{\epsilon}_i)$$
+
+```stata
+xtreg n nL1 nL2 w wL1 k kL1 kL2 ys ysL1 ysL2 yr*, fe cluster(id)
+```
+
+
+**Problem: Nickell Bias**
+
+After demeaning:
+
+- $(n_{it-1} - \bar{n}_i)$ is correlated with $(\epsilon_{it} - \bar{\epsilon}_i)$
+- Why? Because $\bar{n}_i = \frac{1}{T}\sum_{s=1}^T n_{is}$ includes $n_{it}$, which contains $\epsilon_{it}$
+- Result: $\hat{\rho}_{FE}= 0.732$ is **biased downward** ⬇️
+
+$$\text{Nickell Bias} \approx -\frac{1+\rho}{T-1} \approx -\frac{1+0.8}{9-1} \approx -0.225$$
+
+
+
+
+## Solution: Arellano-Bond and System GMM
+
+To address the **Nickell bias**, Arellano and Bond proposed the Arellano-Bond estimator, which uses a Generalized Method of Moments (GMM) approach.
+
+
+1. **First Difference** to eliminate $c_i$:
+
+$$\Delta n_{it} = \rho \Delta n_{it-1} + \Delta X_{it}'\beta + \Delta \epsilon_{it}$$
+
+2. **Problem remains**: $\Delta n_{it-1}$ is correlated with $\Delta \epsilon_{it}$
+   - Because $\Delta n_{it-1} = n_{it-1} - n_{it-2}$ contains $\epsilon_{it-1}$
+   - And $\Delta \epsilon_{it} = \epsilon_{it} - \epsilon_{it-1}$ also contains $\epsilon_{it-1}$
+
+3. **Solution**: Use **lags in levels** as instruments!
+
+      $$E[n_{it-s} \cdot \Delta\epsilon_{it}] = 0 \quad \text{for } s \geq 2$$
+- **Relevance**: $n_{it-2}$ is correlated with $\Delta n_{it-1}$ ✓
+- **Exogeneity**: $n_{it-2}$ is **not** correlated with $\Delta\epsilon_{it} = \epsilon_{it} - \epsilon_{it-1}$
+
+## Stata Implementation 
+
+To implement Arellano-Bond in Stata, we use the `xtabond2`
+
+```stata
+// Arellano-Bond estimation
+xtabond2 n nL1 nL2 w wL1 k kL1 kL2 ys ysL1 ysL2 yr*, ///
+    gmm(L.(n w k), lag(2 .)) ///      // Treat as endogenous, lags 2+
+    iv(L(0/2).ys yr*) ///              // Treat as exogenous
+    noleveleq ///                       // Difference GMM only
+    robust ///                          // Robust standard errors
+    small                               // Small sample correction
+```
+
+**Key Options**
+
+- `gmm(L.(n w k), lag(2 .))`: Use lags 2, 3, ... as instruments
+- `iv(L(0/2).ys yr*)`: Exogenous variables (standard instruments)
+- `noleveleq`: Exclude level equation (pure Difference GMM)
+
+
+## Results
+
+Comparing the estimates:
+
+| Variable | Pooled OLS | Random Effects | Fixed Effects | Arellano–Bond |
+|:---------|:----------:|:--------------:|:-------------:|:-------------:|
+| nL1      | 1.044***   | 1.044***       | 0.732***      | 0.817***      |
+
+
+1. $\hat{\rho}_{AB} = 0.817$ lies between FE (0.732) and OLS (1.044) ✓
+
+    $$\hat{\rho}_{fe} < \hat{\rho}_{ab} < \hat{\rho}_{pooled, re}$$
+
+2. Implies **strong employment persistence** (elasticity = 0.82)
+3. AR(2) test: p = 0.307 → No second-order correlation ✓
+4. Hansen test: p = 0.174 → Instruments are valid ✓
+
+
+**Why AB is in the middle:**
+
+- **Removes upward bias**: First differences eliminate $c_i$
+- **Removes downward bias**: Instruments break the mechanical correlation

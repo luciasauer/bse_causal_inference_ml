@@ -189,67 +189,98 @@ $presentation-font: "Latin Modern Roman", "Computer Modern Serif", "STIX Two Tex
   margin-top: 14px;
 }
 
-
-/* Mejoras específicas para PDF (print desde reveal) */
-@media print {
-  .reveal {
-    font-size: 28px;
-  }
-
-  .reveal,
-  .reveal .slides section {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .box-blue, pre, code, blockquote, table {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  a {
-    text-decoration: none !important;
-  }
-}
-
-
-@media print {
-  html, body,
-  .reveal-viewport,
-  .reveal,
-  .reveal .slides section {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background: $global-background !important;
-  }
-}
-
-/* --- Rounded code block enhancements --- */
-/* Increase rounding, padding and ensure highlight box follows radius */
-.reveal pre, .reveal code, .reveal .sourceCode {
-  border-radius: 18px !important;
-  padding: 16px !important;
-  overflow: auto;
-  background-clip: padding-box; /* ensures background & border-radius behave */
-}
-
-.reveal .hljs {
-  border-radius: 14px !important;
-  background: transparent !important; /* let outer pre/code bg show */
-}
-
-/* Slightly larger monospace for readability inside slides */
-.reveal pre, .reveal code {
-  font-size: 20px;
-  font-family: "Fira Code", "Source Code Pro", Menlo, monospace;
-  line-height: 1.45;
-}
-
-/* Fondo global real (viewport completo) */
+/* =========================================================
+   Global background (HTML + PDF)
+   ---------------------------------------------------------
+   Reveal has multiple nested containers (viewport, slides,
+   sections). We set the same background on all of them to
+   avoid white margins or inconsistent page backgrounds.
+   ========================================================= */
 html, body,
 .reveal-viewport,
 .reveal,
 .reveal .slides,
 .reveal .slides section {
   background: $global-background !important;
+}
+
+/* =========================================================
+   Code block styling (HTML + PDF)
+   ---------------------------------------------------------
+   Make code blocks look polished (rounded corners, padding)
+   and ensure the syntax highlighting layer doesn't override
+   the container background.
+   ========================================================= */
+.reveal pre,
+.reveal code,
+.reveal .sourceCode {
+  border-radius: 18px !important;
+  padding: 16px !important;
+  overflow: auto;
+  background-clip: padding-box; /* keeps background inside rounded corners */
+}
+
+.reveal .hljs {
+  border-radius: 14px !important;
+  background: transparent !important; /* let the outer <pre> define background */
+}
+
+.reveal pre,
+.reveal code {
+  font-size: 20px;
+  font-family: "Fira Code", "Source Code Pro", Menlo, monospace;
+  line-height: 1.45;
+}
+
+/* =========================================================
+   Print/PDF overrides (Reveal -> Print/Export)
+   ---------------------------------------------------------
+   When printing to PDF, browsers may "optimize" colors and
+   keep large screen fonts, which can cause slides to overflow
+   into multiple pages. These rules:
+   1) preserve exact colors
+   2) scale down typography so each slide fits on one page
+   3) reduce table/output size (often the biggest culprit)
+   ========================================================= */
+@media print {
+
+  /* Preserve colors exactly (avoid washed-out backgrounds) */
+  html, body,
+  .reveal-viewport,
+  .reveal,
+  .reveal .slides,
+  .reveal .slides section {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Base font size for the whole deck in PDF */
+  .reveal {
+    font-size: 20px;
+  }
+
+  /* IMPORTANT: Paragraphs and list items were set in px for HTML,
+     so we must explicitly override them for print. */
+  .reveal p,
+  .reveal li {
+    font-size: 20px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Headings in print: keep hierarchy but prevent oversized titles */
+  .reveal h1 { font-size: 40px !important; }
+  .reveal h2 { font-size: 32px !important; }
+  .reveal h3 { font-size: 26px !important; }
+
+  /* Tables/outputs: shrink slightly to avoid overflow */
+  .reveal table {
+    font-size: 16px !important;
+  }
+
+  /* Optional: shrink code a bit more in PDF if needed */
+  .reveal pre,
+  .reveal code {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
 }

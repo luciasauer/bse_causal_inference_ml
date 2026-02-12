@@ -252,3 +252,90 @@ $$\hat{h}^* = 0.9 \times \min\left(s, \frac{IQR}{1.34}\right) \times N^{-1/5}$$
 :::
 
 <!-- Note: The histogram is a special case of the kernel density estimator where the kernel is the uniform (rectangular) density.  -->
+
+# Non Parametric Regression
+
+## Binned Scatter plots
+With large N, scatter plots become unreadable, and can't see conditional means:
+
+**Binscatter Steps:**
+
+1. Divide tenure into 20 bins
+2. Calculate mean of wage within each bin
+3. Plot (mean tenure, mean wage) for each bin
+
+```stata
+scatter wage tenure
+binscatter wage tenure, nq(20)
+```
+
+::: {.columns}
+::: {.column width="50%"}
+<div style="text-align: center;">
+  <img src="scatter_raw.png" width="100%">
+</div>
+
+:::
+
+::: {.column width="50%"}
+<div style="text-align: center;">
+  <img src="bin_basic.png" width="100%">
+</div>
+:::
+:::
+
+
+## Controlling for Covariates
+
+**Frisch-Waugh-Lovell (FWL) Theorem:**
+
+Residualize both Y and X with respect to controls:
+
+1. Regress wage on controls $\rightarrow$ get residuals $\tilde{wage}$
+2. Regress tenure on controls $\rightarrow$ get residuals $\tilde{tenure}$
+3. Binscatter: plot $\tilde{wage}$ vs $\tilde{tenure}$
+
+**In Stata:**
+```stata
+binscatter wage tenure, controls(age)
+```
+
+<div style="text-align: center;">
+  <img src="bin_basic_controls.png" width="70%">
+</div>
+
+**Assumption:** Linearity in controls  
+**Violation:** If controls enter nonlinearly → misleading plot
+
+---
+
+## Binscatter by Groups
+
+**Compare relationships across subgroups:**
+```stata
+binscatter wage tenure, nq(20) by(union)
+```
+
+<div style="text-align: center;">
+  <img src="bscat_union.png" width="70%">
+</div>
+
+
+Shows $E(wage|tenure)$ separately for union, useful for heterogeneity analysis.
+
+---
+
+## Cattaneo et al. (2024)
+
+**Traditional binscatter issues:**
+
+1. Assummes linear CEF
+1. **Bin choice matters** (10 vs 20 vs 50 bins)
+2. **No formal inference** (confidence intervals)
+
+
+**`binsreg` improvements:**
+
+1. Employs semi-parametric methods to visualize CEF
+2. **Data-driven bin selection** (optimal number of bins)
+3. **Confidence intervals** (pointwise or uniform bands)

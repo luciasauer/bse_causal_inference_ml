@@ -11,9 +11,10 @@
 ********************************************************************************
 
 
-
-
-
+********************************************************************************
+* Non Linear panel data models
+********************************************************************************
+{
 * Clear workspace
 clear all
 set more off
@@ -114,8 +115,7 @@ estimates store clogit_fe
 
 * Note how many observations/groups are used
 di "Groups with variation: " e(N_g)
-
-
+}
 
 
 ********************************************************************************
@@ -292,3 +292,4 @@ INTERPRETATION:
 kdensity price, kernel(epan) normal 
 
 }
+

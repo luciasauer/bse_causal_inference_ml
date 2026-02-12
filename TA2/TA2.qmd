@@ -1,0 +1,254 @@
+---
+format:
+  revealjs:
+    title-slide: false
+---
+
+<section class="title-slide-custom">
+<div class="title-main">Causal Inference & ML</div>
+<div class="title-ta">TA Session 2</div>
+<div class="title-program">Data Science for Decision Making</div>
+<div class="title-author">Lucia Sauer</div>
+<div class="title-date">2026-02-13</div>
+</section>
+
+
+# Outline
+
+:::incremental
+- Non Linear Models
+- Histograms + KDE
+- Binned scatter plots
+- Local Linear regression
+- Robinson’s difference estimator
+:::
+
+
+# Non Linear Models
+
+# The Data
+
+- **Dataset:** CRIME4 (Wooldridge)
+- **Panel structure:** 90 counties, T=7 years (1981-1987)
+
+- **Outcome variable:** Binary indicator for high crime rate
+
+$$\text{high_crime}_{it} = \begin{cases} 1 & \text{if crime rate} > 0.04 \\ 0 & \text{otherwise} \end{cases}$$
+
+
+- **Key regressors:** 
+  - `lprbarr`: log probability of arrest
+  - `lprbconv`: log probability of conviction
+  - `lpolpc`: log police per capita
+  - `ldensity`: log population density
+  - `lwcon`: log construction wage
+
+<span style="color:#1f3a93; font-weight:600;">Research question</span>: What determines whether a county experiences high crime?
+
+
+
+## Linear Probability Model with FE
+
+<span style="color:#1f3a93; font-weight:600;">Question</span>: How would you estimate a LPM with county fixed effects?
+
+**Model:**
+$$\text{high_crime}_{it} = \alpha_i + X_{it}'\beta  + \varepsilon_{it}$$
+
+where:
+
+- $\alpha_i$ = county fixed effect
+- $\beta$ = **marginal effects** (direct interpretation)
+
+**Within transformation get rid off $\alpha_i$:**
+
+1. Demeaning and get rid off $\alpha_i$
+$$
+\text{high_crime}_{it} - \bar{\text{high_crime}}_{i}
+= (X_{it} - \bar X_i)'\beta + (\varepsilon_{it} - \bar \varepsilon_i)
+$$
+2. Run FE regression over this transformed model
+$$
+\tilde{\text{high_crime}}_{it}
+= \tilde X_{it}'\beta + \tilde \varepsilon_{it}
+$$
+
+```stata
+xtreg high_crime lprbarr lprbconv lpolpc ldensity lwcon, fe vce(cluster county)
+```
+
+## LPM: The Problem
+:::incremental
+
+1. Predictions outside the [0,1] range  
+
+   $$
+   \hat P(\text{high\_crime}=1) > 1 \quad (25 \text{ observations})
+   $$
+
+   $$
+   \hat P(\text{high\_crime}=1) < 0 \quad (180 \text{ observations})
+   $$
+
+2. Heteroskedasticity (by construction)  
+
+   $$
+   \text{Var}(\varepsilon_{it} \mid X_{it}) = P_{it}(1 - P_{it})
+   $$
+
+   Depends on $X_{it}$
+
+3. Constant marginal effects (unrealistic)  
+
+   A 1% increase in arrest probability reduces high crime by **9.8 percentage points**  
+   for all counties, regardless of whether the baseline probability is 5% or 80%.
+
+4. Imposed linearity
+
+:::
+
+
+## Nonlinear Model: Logit with FE
+
+**Model specification:**
+
+$$P(\text{high_crime} = 1 \mid X_{it}, \alpha_i) = \Lambda(X_{it}'\beta + \alpha_i)$$
+
+where $\Lambda(z) = \frac{\exp(z)}{1 + \exp(z)}$ is the **logistic CDF**
+
+$$
+P(\text{high_crime}_{it}=1 \mid X_{it},\alpha_i)
+= \frac{\exp(\alpha_i + X_{it}'\beta)}{1+\exp(\alpha_i + X_{it}'\beta)}
+$$
+
+- Probabilities are **guaranteed** to be in [0,1], 
+- Better fit for binary outcomes
+- Non-constant marginal effects
+
+::: {.box-blue}
+<div class="box-title">The IPP problem</div>
+
+But estimating $\beta$ and 90 $\alpha_i$ with only $T=7$ obsertavations creates the **Incidental Parameters Problem**
+
+- As $N \to \infty$ but $T$ fixed $\Rightarrow$ $\hat{\beta}$ is **inconsistent**
+- Bias $= O(1/T) \approx 14\%$
+
+:::
+
+
+## Solution: Sufficient Statistic
+
+For the logit model, 
+
+$$S_i = \sum_{t=1}^T \text{high_crime}_{it}$$ 
+
+is a **sufficient statistic** for $\alpha_i$
+
+**Definition:** $S_i$ is sufficient for $\alpha_i$ if:
+
+$$P(\text{high_crime}_{i1},...,\text{high_crime}_{iT} \mid S_i, X_i, \beta) \text{ does not depend on } \alpha_i$$
+
+**What this means:**
+
+- All information about $\alpha_i$ is captured by $S_i$
+- Conditioning on $S_i$ eliminates $\alpha_i$ from the likelihood
+
+$$f(\text{high_crime}_{it}|\alpha_i, X_{it}, \beta, S_i) = f(\text{high_crime}_{it}|X_{it}, \beta, S_i)$$
+
+where $f(\cdot)$ is the joint density to maximize
+
+**Cost:** Only counties with $0 < S_i < 7$ contribute (14 of 90)
+
+**Instead of maximizing:**
+$$L(\beta, \alpha_1,...,\alpha_N \mid y, x)$$
+
+**Maximize the conditional likelihood:**
+$$L_c(\beta \mid y, x, S_1,...,S_N) = \prod_{i=1}^N P(y_i \mid S_i, x_i, \beta)$$
+
+**Result:** 
+
+- $\alpha_i$ **disappears** from the likelihood
+- Estimate $\beta$ **without** estimating $\alpha_i$
+- $\hat{\beta}$ is **consistent** even with small T
+
+
+## Conditional Logit
+
+In stata conditional Logit is implemented using `xtlogit` and `or` to interpret the coefficients as odds ratios (ORs):
+
+```stata
+xtlogit high_crime lprbarr lprbconv lpolpc ldensity lwcon, fe or
+```
+
+**Results** (N=98, 14 counties):
+
+| Variable | Odds Ratio | Interpretation |
+|----------|-----------|----------------|
+| lprbarr  | 0.0002*** | ↓ Reduces odds 99.98% |
+| lprbconv | 0.0002*** |  ↓ Reduces odds 99.98% |
+| lpolpc   | 13,067*** |  ↑ Increases odds (!) |
+| ldensity | 5,369     |  Not significant |
+| lwcon    | 0.432     |  Not significant |
+
+**Key findings:**
+
+- **Strong deterrence:** Higher arrest/conviction probability dramatically reduces crime odds
+- **Police puzzle:** Positive coefficient likely reflects **reverse causality** (crime → hire police)
+- **Sample note:** Only 14 "switcher" counties used (76 dropped due to no variation)
+
+
+<span style="color:#1f3a93; font-weight:600;">Interpretation</span>: OR $<$ 1 decreases odds, OR $>$ 1 increases odds.
+
+<!-- new_odds = original odss * OR
+= 100*0.0003 = 0.02
+the odds reduce from 100 to 0.02, so the odds are reduced by 99.98% -->
+
+# Nonparametric Density Estimation
+
+## Histograms
+
+A nonparametric method to estimate the probability density function (PDF)
+
+$$\hat f(x_0)
+= \frac{1}{Nh}\sum_{i=1}^N \frac{1}{2}\,
+\mathbf 1\!\left(\left|\frac{x_i - x_0}{h}\right| < 1\right)$$
+
+**Idea:** Count observations in bins, normalize by sample size and bin width
+
+The degree of smoothing of the histogram can be controlled by selecting:
+
+1. Number of bins
+```stata
+histogram price, bin(10)  name(hist10, replace)
+```
+1. Bin width $2h$
+```stata
+histogram price, width(2000) density name(hist_wide, replace)
+```
+
+## Kernel Density
+
+Smooth, nonparametric estimate of the probability density function
+
+$$\hat f(x_0)
+= \frac{1}{Nh}\sum_{i=1}^N \,
+K \!\left(\frac{x_i - x_0}{h}\right)$$
+
+
+- Role of $K(\cdot)$: weighting function that determines how much each observation $x_i$ contributes to the density estimate at the point $x_0$
+- Role of $h$: smoothing parameter that controls the width of the kernel.
+
+
+::: {.box-blue}
+<div class="box-title">**How to choose optimal h?**</div>
+
+- The one that minimizes MISE, but since we do not know $f$ that is the true density function, we can assume that it follows a Normal distribution $f \approx N(\mu, \sigma^2)$.
+- Silverman's Plug-in Solution is the one used by default in Stata. 
+
+$$\hat{h}^* = 1.364 \times \delta \times \min\left(s, \frac{IQR}{1.34}\right) \times N^{-1/5}$$
+
+For Epanechnikov kernel: 
+
+$$\hat{h}^* = 0.9 \times \min\left(s, \frac{IQR}{1.34}\right) \times N^{-1/5}$$
+:::
+
+<!-- Note: The histogram is a special case of the kernel density estimator where the kernel is the uniform (rectangular) density.  -->

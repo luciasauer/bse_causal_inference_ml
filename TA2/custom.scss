@@ -1,0 +1,286 @@
+/*-- scss:defaults --*/
+
+/* Paleta tipo LaTeX/Beamer */
+$blue-title: #1f3a93;
+$blue-box:   #1f3a93;
+$text-color: #111111;
+/*Global background color*/
+$global-background: #fffff8;
+
+/* Tipografías */
+$presentation-font-size-root: 32px; // base general
+$presentation-heading-font: "Latin Modern Roman", "Computer Modern Serif", "STIX Two Text", "Times New Roman", serif;
+$presentation-font: "Latin Modern Roman", "Computer Modern Serif", "STIX Two Text", "Times New Roman", serif;
+
+
+/*-- scss:rules --*/
+
+/* Fondo global para todas las slides */
+.reveal {
+  background-color: $global-background;
+}
+
+.reveal .slides section {
+  background-color: $global-background;
+}
+
+.reveal {
+  font-family: $presentation-font;
+  color: $text-color;
+}
+
+/* Títulos */
+.reveal h1, .reveal h2, .reveal h3 {
+  color: $blue-title;
+  font-family: $presentation-heading-font;
+  font-weight: 500;
+}
+
+/* Aire tipo LaTeX */
+.reveal section {
+  line-height: 1.25;
+}
+
+.reveal p, .reveal li {
+  font-size: 30px;   /* ajustá si querés */
+  line-height: 1.22;
+}
+
+/* Slide de título */
+.reveal .title-slide h1 {
+  font-size: 72px;
+  margin-bottom: 24px;
+}
+.reveal .title-slide h2 {
+  font-size: 40px;
+  margin-top: 8px;
+}
+.reveal .title-slide p {
+  font-size: 30px;
+}
+
+/* Carátula */
+.reveal .title-slide h1 {
+  font-size: 72px;
+  margin-bottom: 28px;
+}
+
+.reveal .title-slide h2 {
+  font-size: 40px;
+  font-weight: 400;
+  margin-top: 12px;
+}
+
+.reveal .title-slide p {
+  font-size: 30px;
+  margin-top: 18px;
+}
+
+/* Centrar la carátula manual */
+.title-slide-custom {
+  text-align: center;
+}
+.title-slide-custom > * {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- Footer: centrado, tamaño “institucional”, bien alineado --- */
+.reveal .slide-footer,
+.reveal .footer {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 14px !important;         /* subilo/bajalo */
+  width: 100% !important;
+  text-align: center !important;
+
+  font-size: 18px !important;      /* más legible */
+  line-height: 1.1 !important;
+  color: #777 !important;
+  opacity: 0.9 !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  z-index: 30 !important;
+  pointer-events: none;            /* no molesta al click */
+}
+
+/* Asegura que cualquier <p> dentro no herede 30px */
+.reveal .slide-footer p,
+.reveal .footer p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+
+
+
+/* Número de slide */
+.reveal .slide-number {
+  font-size: 18px;
+  color: #222;
+  background: transparent;
+}
+
+/* Caja azul */
+.box-blue {
+  border: 4px solid $blue-box;
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-top: 18px;
+
+  /* NUEVO: fondo celeste claro */
+  background-color: #f2f6ff;
+}
+
+
+.box-blue .box-title {
+  color: $blue-title;
+  font-size: 38px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Bullets azules */
+.reveal ul li::marker {
+  color: $blue-title;
+}
+
+
+/* ===== Carátula estilo Beamer académico ===== */
+
+.title-main {
+  color: $blue-title;
+  font-size: 72px;
+  font-weight: 500;
+}
+
+/* TA Session: mismo azul, NO bold */
+.title-ta {
+  color: $blue-title;
+  font-size: 40px;
+  font-weight: 400;
+  margin-top: 18px;
+}
+
+/* Programa */
+.title-program {
+  font-size: 30px;
+  color: #111;
+  margin-top: 18px;
+  font-style: italic;
+}
+
+/* Autor */
+.title-author {
+  font-size: 30px;
+  color: #111;
+  margin-top: 18px;
+}
+
+/* Fecha */
+.title-date {
+  font-size: 28px;
+  color: #111;
+  margin-top: 14px;
+}
+
+/* =========================================================
+   Global background (HTML + PDF)
+   ---------------------------------------------------------
+   Reveal has multiple nested containers (viewport, slides,
+   sections). We set the same background on all of them to
+   avoid white margins or inconsistent page backgrounds.
+   ========================================================= */
+html, body,
+.reveal-viewport,
+.reveal,
+.reveal .slides,
+.reveal .slides section {
+  background: $global-background !important;
+}
+
+/* =========================================================
+   Code block styling (HTML + PDF)
+   ---------------------------------------------------------
+   Make code blocks look polished (rounded corners, padding)
+   and ensure the syntax highlighting layer doesn't override
+   the container background.
+   ========================================================= */
+.reveal pre,
+.reveal code,
+.reveal .sourceCode {
+  border-radius: 18px !important;
+  padding: 16px !important;
+  overflow: auto;
+  background-clip: padding-box; /* keeps background inside rounded corners */
+}
+
+.reveal .hljs {
+  border-radius: 14px !important;
+  background: transparent !important; /* let the outer <pre> define background */
+}
+
+.reveal pre,
+.reveal code {
+  font-size: 20px;
+  font-family: "Fira Code", "Source Code Pro", Menlo, monospace;
+  line-height: 1.45;
+}
+
+/* =========================================================
+   Print/PDF overrides (Reveal -> Print/Export)
+   ---------------------------------------------------------
+   When printing to PDF, browsers may "optimize" colors and
+   keep large screen fonts, which can cause slides to overflow
+   into multiple pages. These rules:
+   1) preserve exact colors
+   2) scale down typography so each slide fits on one page
+   3) reduce table/output size (often the biggest culprit)
+   ========================================================= */
+@media print {
+
+  /* Preserve colors exactly (avoid washed-out backgrounds) */
+  html, body,
+  .reveal-viewport,
+  .reveal,
+  .reveal .slides,
+  .reveal .slides section {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Base font size for the whole deck in PDF */
+  .reveal {
+    font-size: 20px;
+  }
+
+  /* IMPORTANT: Paragraphs and list items were set in px for HTML,
+     so we must explicitly override them for print. */
+  .reveal p,
+  .reveal li {
+    font-size: 20px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Headings in print: keep hierarchy but prevent oversized titles */
+  .reveal h1 { font-size: 40px !important; }
+  .reveal h2 { font-size: 32px !important; }
+  .reveal h3 { font-size: 26px !important; }
+
+  /* Tables/outputs: shrink slightly to avoid overflow */
+  .reveal table {
+    font-size: 16px !important;
+  }
+
+  /* Optional: shrink code a bit more in PDF if needed */
+  .reveal pre,
+  .reveal code {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
+}

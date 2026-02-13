@@ -149,19 +149,10 @@ $$P(\text{high_crime}_{i1},...,\text{high_crime}_{iT} \mid S_i, X_i, \beta) \tex
 
 **What this means:**
 
-- All information about $\alpha_i$ is captured by $S_i$
-- Conditioning on $S_i$ eliminates $\alpha_i$ from the likelihood
-
-$$f(\text{high_crime}_{it}|\alpha_i, X_{it}, \beta, S_i) = f(\text{high_crime}_{it}|X_{it}, \beta, S_i)$$
-
-where $f(\cdot)$ is the joint density to maximize
-
-**Cost:** Only counties with $0 < S_i < 7$ contribute (14 of 90)
-
-**Instead of maximizing:**
+Instead of maximizing:
 $$L(\beta, \alpha_1,...,\alpha_N \mid y, x)$$
 
-**Maximize the conditional likelihood:**
+Maximize the conditional likelihood:
 $$L_c(\beta \mid y, x, S_1,...,S_N) = \prod_{i=1}^N P(y_i \mid S_i, x_i, \beta)$$
 
 **Result:** 
@@ -169,6 +160,8 @@ $$L_c(\beta \mid y, x, S_1,...,S_N) = \prod_{i=1}^N P(y_i \mid S_i, x_i, \beta)$
 - $\alpha_i$ **disappears** from the likelihood
 - Estimate $\beta$ **without** estimating $\alpha_i$
 - $\hat{\beta}$ is **consistent** even with small T
+
+**Cost:** Only counties with $0 < S_i < 7$ contribute (14 of 90)
 
 
 ## Conditional Logit
@@ -272,14 +265,14 @@ binscatter wage tenure, nq(20)
 ::: {.columns}
 ::: {.column width="50%"}
 <div style="text-align: center;">
-  <img src="scatter_raw.png" width="100%">
+  <img src="scatter_raw.png" width="60%">
 </div>
 
 :::
 
 ::: {.column width="50%"}
 <div style="text-align: center;">
-  <img src="bin_basic.png" width="100%">
+  <img src="bin_basic.png" width="60%">
 </div>
 :::
 :::
@@ -301,7 +294,7 @@ binscatter wage tenure, controls(age)
 ```
 
 <div style="text-align: center;">
-  <img src="bin_basic_controls.png" width="70%">
+  <img src="bin_basic_controls.png" width="60%">
 </div>
 
 **Assumption:** Linearity in controls  
@@ -317,13 +310,13 @@ binscatter wage tenure, nq(20) by(union)
 ```
 
 <div style="text-align: center;">
-  <img src="bscat_union.png" width="70%">
+  <img src="bscat_union.png" width="60%">
 </div>
 
 
 Shows $E(wage|tenure)$ separately for union, useful for heterogeneity analysis.
 
----
+
 
 ## Cattaneo et al. (2024)
 
@@ -339,3 +332,177 @@ Shows $E(wage|tenure)$ separately for union, useful for heterogeneity analysis.
 1. Employs semi-parametric methods to visualize CEF
 2. **Data-driven bin selection** (optimal number of bins)
 3. **Confidence intervals** (pointwise or uniform bands)
+
+# Nonparametric Regression
+
+## Kernel regression: Nadaraya-Watson Estimator
+
+- Instead of using a rectangular kernell as with `binscatter`, now we could adapt the kernell function to make smooth the approximation to the CEF:
+
+
+$$\hat{m}_{NW}(x_0) = \frac{\sum_{i=1}^N K\left(\frac{x_i - x_0}{h}\right) y_i}{\sum_{i=1}^N K\left(\frac{x_i - x_0}{h}\right)}$$
+
+- Points closer to $x_0$ get more weight
+- Can be interpreted as weighted local average
+
+Equivalent to:
+
+$$\min_{\beta_0}\sum (y_i-\beta_0)^2K\!\left(\frac{x_i-x_0}{h}\right)$$
+
+## Bandwidth and Bias--Variance Tradeoff
+
+- As we discussed, the election of $h$ is which control the variance bias trade off.  
+
+<div style="text-align: center;">
+  <img src="nw_bandwidth_comparison.png" width="60%">
+</div>
+
+## Choosing optimal $h$: 
+
+**Leave-One-Out Cross Validation**: choose $h$ such that it minimized the MISE out of sample.
+
+$$\text{Toy data:} \quad (x,y)=\{(1,2),(2,3),(3,2),(4,5)\}$$
+
+1. Step 1: Try bandwidth $h$.
+
+2. Step 2: remove $(1,2)$  
+
+  Estimate $\hat{m_{-1,h}}(1)$ using remaining three points.
+
+2. Step 3: prediction error:
+
+  $$(2-\hat{m_{-1,h}}(1))^2$$
+
+  Repeat for all points:
+
+  $$CV(h)=\frac{1}{4}\sum_{i=1}^4 (y_i-\hat{m_{-i,h}}(x_i))^2$$
+
+Choose $h$ minimizing $CV(h)$.
+
+**In practice:** `lpoly` uses plug-in bandwidth approximating this optimum.
+
+
+## Local Linear Regression
+
+Instead of approximating the function close to $x_0$ with a constant, now we can approximate it with a line.
+
+For each $x_0$ solves:
+
+$$\min_{\beta_0,\beta_1}\sum (y_i-\beta_0-\beta_1(x_i-x_0))^2K\!\left(\frac{x_i-x_0}{h}\right)$$
+
+$$\hat{m(x_0)}=\hat{\beta_0}, \qquad \hat{m'(x_0)}=\hat{\beta_1}$$
+
+
+<div style="text-align: center;">
+  <img src="nw_vs_ll.png" width="60%">
+</div>
+
+
+
+## npregress and Marginal Effects
+
+```stata
+npregress kernel wage tenure
+npgraph, title("Local Linear using npregress")
+```
+1. Allows multiple covariates
+2. Allows to make inference using (SE, VCE, robust)
+3. Allows to obtain marginal effects
+
+<div style="text-align: center;">
+  <img src="npregress_plot.png" width="60%">
+</div>
+
+
+
+# Semiparametric regression models 
+
+
+## Hedonic pricing equation of houses
+
+- **Dataset:** HPRICE3 (Wooldridge)
+- **Outcome variable:** Log of house prices
+
+$$\text{lprice}_i = X_i'\beta + \lambda(\text{ldist}_i) + u_i \quad \text{with} \quad E(u_i|X_i,\text{ldist}_i)=0$$
+
+- **Key regressors:** 
+  - `larea`: log of square footage of house
+  - `lland`: log of square footage lot
+  - `rooms`: # rooms in house
+  - `bath`: # bathrooms
+  - `age`: age of the house 
+  - `ldist`: log dist. from house to incin., feet
+
+<span style="color:#1f3a93; font-weight:600;">Research question</span>: What was the effect of a local garbage incinerator on housing prices in North Andover in 1981?
+
+House characteristics affect prices approximately **linearly**, but distance may have **nonlinear disamenity effects**.
+
+## Robinson Difference Estimator (PLM)
+
+A nonparametric Frisch–Waugh “partialling-out” procedure.
+
+
+1. Estimate conditional means (kernel):
+$$\hat{m_y}(\text{ldist}_i)=E(\text{lprice}_i|\text{ldist}_i)$$  
+$$\hat{m_X}(\text{ldist}_i)=E(X_i|\text{ldist}_i)$$
+
+2. Partial out distance:
+$$\tilde{\text{lprice}_i}=\text{lprice}_i-\hat{m_y}(\text{ldist}_i)$$
+$$\tilde{X_i}=X_i-\hat{m_X}(\text{ldist}_i)$$
+
+3. OLS:
+$$\tilde{y_i}=\tilde X_i'\beta+u_i$$
+
+4. Recover nonlinear effect:
+$$\hat{\lambda}(\text{ldist}_i)=\hat{m_y}(\text{ldist}_i)-\hat{m_X}(\text{ldist}_i)\hat{\beta}$$
+
+**Idea:** remove distance nonparametrically $\rightarrow$ estimate $\beta$ with clean variation $\rightarrow$ reconstruct $\lambda$.
+
+## Implementation
+
+```stata
+semipar lprice larea lland rooms bath age if y81==1, ///
+    nonpar(ldist) robust ci ///
+    title("ldist non parametric") ///
+    xtitle("ldist") ///
+    ytitle("{&lambda}(ldist)")
+```
+
+**Parametric part:**
+
+<div style="margin-top: 0.6em;"></div>
+
+```{=html}
+<pre style="background-color:#f7f7f7; color:#111; font-family:Courier New, monospace; font-size:0.7em; padding:1em; border-radius:10px;">
+
+                                                       Number of obs =     142
+                                                       R-squared     =  0.6863
+                                                       Adj R-squared =  0.6748
+                                                       Root MSE      =  0.1859
+------------------------------------------------------------------------------
+      lprice | Coefficient  Std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+       larea |   .3266051   .0887425     3.68   0.000     .1511228    .5020874
+       lland |   .0790684   .0316665     2.50   0.014       .01645    .1416868
+       rooms |    .026588   .0234205     1.14   0.258    -.0197244    .0729003
+       baths |   .1611464   .0463598     3.48   0.001      .069473    .2528198
+         age |  -.0029953    .000969    -3.09   0.002    -.0049113   -.0010793
+------------------------------------------------------------------------------
+</pre>
+```
+
+## Implementation
+
+```stata
+semipar lprice larea lland rooms bath age if y81==1, ///
+    nonpar(ldist) robust ci ///
+    title("ldist non parametric") ///
+    xtitle("ldist") ///
+    ytitle("{&lambda}(ldist)")
+```
+
+**Non parametric part:**
+
+<div style="text-align: center;">
+  <img src="semipar.png" width="60%">
+</div>

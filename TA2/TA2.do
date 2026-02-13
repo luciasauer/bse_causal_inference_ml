@@ -4,15 +4,16 @@
 * 
 * This do file combines:
 *   1. Non Linear panel data models
-*   2. Non parametric estimation
+*   2. Nonparametric Density Estimation
+*	3. Nonparametric Regression: Nadaraya-Watson & Local Linear
+*	4. Semiparametric regression: Robinson Difference Estimator
 *
 * Author: Lucia Sauer
 * Date: February 2026
 ********************************************************************************
 
-
 ********************************************************************************
-* Non Linear panel data models
+* 1. Non Linear panel data models
 ********************************************************************************
 {
 * Clear workspace
@@ -117,9 +118,8 @@ estimates store clogit_fe
 di "Groups with variation: " e(N_g)
 }
 
-
 ********************************************************************************
-* Nonparametric Density Estimation
+* 2. Nonparametric Density Estimation
 ********************************************************************************
 {
 
@@ -293,3 +293,236 @@ kdensity price, kernel(epan) normal
 
 }
 
+********************************************************************************
+*3. Nonparametric Regression: Nadaraya-Watson & Local Linear
+********************************************************************************
+{
+sysuse nlsw88, clear
+
+/*==============================================================================
+  Part 1: Nadaraya-Watson (Local Constant)
+==============================================================================*/
+
+/*------------------------------------------------------------------------------
+  What is NW doing?
+  
+  At each point x₀:
+  1. Calculate weights K((xᵢ - x₀)/h) for all observations
+  2. Weighted average: m̂(x₀) = Σ Kᵢ yᵢ / Σ Kᵢ
+  
+  Equivalent to fitting: min Σ[yᵢ - β₀]² · K((xᵢ - x₀)/h)
+------------------------------------------------------------------------------*/
+
+* Basic NW with default bandwidth
+lpoly wage tenure, ///
+    degree(0) ///
+    kernel(epan) ci ///
+    title("Nadaraya-Watson Estimator") ///
+    subtitle("Local constant, degree = 0") ///
+    xtitle("tenure") ytitle("wage") ///
+    name(nw_default, replace)
+
+/*
+INTERPRETATION:
+- Smooth curve through the data
+- Each point = weighted average of nearby prices
+- Bandwidth chosen automatically (Stata default)
+*/
+
+
+/*==============================================================================
+  Part 2: Effect of Bandwidth (Bias-Variance Trade-off)
+==============================================================================*/
+
+* Calculate reasonable bandwidth range
+quietly sum tenure
+local range = r(max) - r(min)
+local h_small = `range' / 40   // Undersmoothed
+local h_medium = `range' / 20  // Balanced
+local h_large = `range' / 5    // Oversmoothed
+
+di "Bandwidths:"
+di "  Small (undersmoothed): " `h_small'
+di "  Medium (balanced): " `h_medium'
+di "  Large (oversmoothed): " `h_large'
+
+quietly summarize wage
+local ymin = r(min)
+local ymax = r(max)
+
+* NW with small bandwidth (high variance, low bias)
+lpoly wage tenure, degree(0) ci bwidth(`h_small') ///
+    title("h = small") ///
+    yscale(range(`ymin' `ymax')) ///
+	ytitle("Hourly wage") ///
+    legend(off) ///
+    name(nw_small, replace)
+
+* NW with medium bandwidth (balanced)
+lpoly wage tenure, degree(0) ci bwidth(`h_medium') ///
+    title("h = medium") ///
+    yscale(range(`ymin' `ymax')) ///
+	ytitle("") ///
+    ylabel(, nolabel) ///
+    legend(off) ///
+    name(nw_medium, replace)
+
+* NW with large bandwidth (low variance, high bias)
+lpoly wage tenure, degree(0) ci bwidth(`h_large') ///
+    title("h = large") ///
+    yscale(range(`ymin' `ymax')) ///
+	ytitle("") ///
+    ylabel(, nolabel) ///
+    legend(off) ///
+    name(nw_large, replace)
+
+* Compare all three
+graph combine nw_small nw_medium nw_large, ///
+    title("Bias-Variance Trade-off: Effect of Bandwidth") ///
+    rows(1) ///
+    ycommon ///
+    imargin(tiny) ///
+    name(bandwidth_comparison, replace)
+
+/*
+INTERPRETATION:
+- Small h: wiggly, high variance, low bias (overfits)
+- Medium h: smooth, balanced bias-variance
+- Large h: very smooth, low variance, high bias (underfits)
+Optimal h balances these extremes
+*/
+
+
+
+
+/*==============================================================================
+  Part 3: Local Linear Regression
+==============================================================================*/
+
+/*------------------------------------------------------------------------------
+  What is Local Linear doing?
+  
+  At each point x₀:
+  Solve: min Σ[yᵢ - β₀ - β₁(xᵢ - x₀)]² · K((xᵢ - x₀)/h)
+  
+  Returns: m̂(x₀) = β̂₀
+           m̂'(x₀) = β̂₁ (derivative!)
+------------------------------------------------------------------------------*/
+
+* Local linear (degree = 1, default)
+lpoly wage tenure, ///
+    degree(1) ///
+    ci ///
+    title("Local Linear Regression") ///
+    subtitle("Degree = 1 (default)") ///
+    xtitle("tenure") ytitle("wage") ///
+    name(ll_default, replace)
+
+/*
+INTERPRETATION:
+- Fits local LINE (not constant)
+- Better at boundaries
+- Adapts to local slope
+*/
+
+
+/*==============================================================================
+  Part 4: Compare NW vs Local Linear
+==============================================================================*/
+
+* NW (degree 0)
+lpoly wage tenure, ///
+    degree(0) ///
+    generate(x_nw m_nw) ///
+    nograph
+
+* Local linear (degree 1)
+lpoly wage tenure, ///
+    degree(1) ///
+    generate(x_ll m_ll) ///
+    nograph
+
+* Plot both on same graph
+twoway (line m_nw x_nw, lcolor(red) lwidth(medium)) ///
+       (line m_ll x_ll, lcolor(blue) lwidth(medium)) ///
+       (scatter wage tenure, mcolor(gray%30) msize(small)), ///
+       legend(order(1 "NW (degree 0)" 2 "Local Linear (degree 1)" 3 "Data")) ///
+       title("NW vs Local Linear") ///
+       xtitle("tenure") ytitle("wage") ///
+       name(nw_vs_ll, replace)
+
+/*
+INTERPRETATION:
+- In the middle: very similar
+- At boundaries: LL performs better (less bias)
+- LL is default in most software for good reason
+*/
+
+
+/*==============================================================================
+  Part 5: Using npregress (Modern Approach)
+==============================================================================*/
+
+* npregress kernel does local linear by default
+npregress kernel wage tenure
+
+/*
+OUTPUT INTERPRETATION:
+- Reports average marginal effect (derivative)
+- More sophisticated than lpoly
+- Can handle multiple covariates
+*/
+
+* Store results
+estimates store np_ll
+
+* Plot with confidence intervals
+npgraph, ///
+    title("Local Linear using npregress") ///
+    name(npregress_plot, replace)
+
+/*
+ADVANTAGES of npregress:
+1. Reports marginal effects directly
+2. Better inference (robust SE)
+3. Can control for other variables
+4. More options (different kernels, bandwidths)
+*/
+
+
+/*==============================================================================
+  Part 6: Marginal Effects (Derivative Estimation)
+==============================================================================*/
+
+* Local linear gives derivative m'(x)
+npregress kernel wage tenure
+
+* Get marginal effect at different points
+margins, at(tenure=(5 10 20 30)) dydx(tenure) vsquish
+
+/*
+INTERPRETATION:
+- Shows how marginal effect of weight varies
+- Example: if dy/dx = 0.186 at tenure = 10, then around tenure = 10,
+  an additional 1 year of tenure is associated with about +0.186 in hourly wage
+  (units: wage per year of tenure).
+- Can see if returns are constant or diminishing
+*/
+
+	
+}
+
+
+********************************************************************************
+*4. Robinson Difference Estimator
+********************************************************************************
+{
+*ssc install semipar
+bcuse hprice3, clear
+
+semipar lprice larea lland rooms bath age if y81==1, ///
+    nonpar(ldist) robust ci ///
+    title("ldist non parametric") ///
+    xtitle("ldist") ///
+    ytitle("{&lambda}(ldist)")
+}

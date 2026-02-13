@@ -17,10 +17,15 @@ format:
 
 :::incremental
 - Non Linear Models
-- Histograms + KDE
-- Binned scatter plots
-- Local Linear regression
-- Robinson’s difference estimator
+- Nonparametric Density Estimation
+  - Histograms
+  - Kernell Density Estimation
+- Non Parametric Regression Models
+  - binscatter
+  - NW estimator
+  - Local Linear Regression
+- Semiparametric Regression Models
+  - Robinson’s difference estimator
 :::
 
 
@@ -82,11 +87,11 @@ xtreg high_crime lprbarr lprbconv lpolpc ldensity lwcon, fe vce(cluster county)
 1. Predictions outside the [0,1] range  
 
    $$
-   \hat P(\text{high\_crime}=1) > 1 \quad (25 \text{ observations})
+   \hat{P}(\text{high_crime}=1) > 1 \quad (25 \text{ observations})
    $$
 
    $$
-   \hat P(\text{high\_crime}=1) < 0 \quad (180 \text{ observations})
+   \hat{P}(\text{high_crime}=1) < 0 \quad (180 \text{ observations})
    $$
 
 2. Heteroskedasticity (by construction)  
@@ -143,18 +148,26 @@ $$S_i = \sum_{t=1}^T \text{high_crime}_{it}$$
 
 is a **sufficient statistic** for $\alpha_i$
 
+
+::: {.fragment}
 **Definition:** $S_i$ is sufficient for $\alpha_i$ if:
 
 $$P(\text{high_crime}_{i1},...,\text{high_crime}_{iT} \mid S_i, X_i, \beta) \text{ does not depend on } \alpha_i$$
+:::
 
+::: {.fragment}
 **What this means:**
 
 Instead of maximizing:
-$$L(\beta, \alpha_1,...,\alpha_N \mid y, x)$$
+$$L(\beta, \alpha_1,...,\alpha_N \mid y, x) = \prod_{i=1}^N \prod_{t=1}^T P(y_{it} \mid \alpha_i, x_i, \beta)$$
+:::
 
+::: {.fragment}
 Maximize the conditional likelihood:
 $$L_c(\beta \mid y, x, S_1,...,S_N) = \prod_{i=1}^N P(y_i \mid S_i, x_i, \beta)$$
+:::
 
+::: {.fragment}
 **Result:** 
 
 - $\alpha_i$ **disappears** from the likelihood
@@ -162,7 +175,7 @@ $$L_c(\beta \mid y, x, S_1,...,S_N) = \prod_{i=1}^N P(y_i \mid S_i, x_i, \beta)$
 - $\hat{\beta}$ is **consistent** even with small T
 
 **Cost:** Only counties with $0 < S_i < 7$ contribute (14 of 90)
-
+:::
 
 ## Conditional Logit
 
@@ -230,10 +243,9 @@ K \!\left(\frac{x_i - x_0}{h}\right)$$
 - Role of $K(\cdot)$: weighting function that determines how much each observation $x_i$ contributes to the density estimate at the point $x_0$
 - Role of $h$: smoothing parameter that controls the width of the kernel.
 
-
+:::{.fragment}
 ::: {.box-blue}
-<div class="box-title">**How to choose optimal h?**</div>
-
+<div class="box-title">How to choose optimal h?</div>
 - The one that minimizes MISE, but since we do not know $f$ that is the true density function, we can assume that it follows a Normal distribution $f \approx N(\mu, \sigma^2)$.
 - Silverman's Plug-in Solution is the one used by default in Stata. 
 
@@ -244,6 +256,7 @@ For Epanechnikov kernel:
 $$\hat{h}^* = 0.9 \times \min\left(s, \frac{IQR}{1.34}\right) \times N^{-1/5}$$
 :::
 
+:::
 <!-- Note: The histogram is a special case of the kernel density estimator where the kernel is the uniform (rectangular) density.  -->
 
 # Non Parametric Regression
@@ -265,14 +278,13 @@ binscatter wage tenure, nq(20)
 ::: {.columns}
 ::: {.column width="50%"}
 <div style="text-align: center;">
-  <img src="scatter_raw.png" width="60%">
+  <img src="figures/scatter_raw.png" width="60%">
 </div>
-
 :::
 
 ::: {.column width="50%"}
 <div style="text-align: center;">
-  <img src="bin_basic.png" width="60%">
+  <img src="figures/bin_basic.png" width="60%">
 </div>
 :::
 :::
@@ -281,8 +293,6 @@ binscatter wage tenure, nq(20)
 ## Controlling for Covariates
 
 **Frisch-Waugh-Lovell (FWL) Theorem:**
-
-Residualize both Y and X with respect to controls:
 
 1. Regress wage on controls $\rightarrow$ get residuals $\tilde{wage}$
 2. Regress tenure on controls $\rightarrow$ get residuals $\tilde{tenure}$
@@ -294,11 +304,11 @@ binscatter wage tenure, controls(age)
 ```
 
 <div style="text-align: center;">
-  <img src="bin_basic_controls.png" width="60%">
+  <img src="figures/bin_basic_controls.png" width="40%">
 </div>
 
-**Assumption:** Linearity in controls  
-**Violation:** If controls enter nonlinearly → misleading plot
+**Problem:** assumes linearity in controls, if this is not true $\rightarrow$ misleading plot.
+
 
 ---
 
@@ -310,7 +320,7 @@ binscatter wage tenure, nq(20) by(union)
 ```
 
 <div style="text-align: center;">
-  <img src="bscat_union.png" width="60%">
+  <img src="figures/bscat_union.png" width="50%">
 </div>
 
 
@@ -337,7 +347,8 @@ Shows $E(wage|tenure)$ separately for union, useful for heterogeneity analysis.
 
 ## Kernel regression: Nadaraya-Watson Estimator
 
-- Instead of using a rectangular kernell as with `binscatter`, now we could adapt the kernell function to make smooth the approximation to the CEF:
+- `binscatter` can be seen as using an implicit rectangular (uniform) kernel.
+- Kernel regression replaces this with a smooth weighting function to obtain a smooth approximation of the CEF:
 
 
 $$\hat{m}_{NW}(x_0) = \frac{\sum_{i=1}^N K\left(\frac{x_i - x_0}{h}\right) y_i}{\sum_{i=1}^N K\left(\frac{x_i - x_0}{h}\right)}$$
@@ -350,30 +361,33 @@ Equivalent to:
 $$\min_{\beta_0}\sum (y_i-\beta_0)^2K\!\left(\frac{x_i-x_0}{h}\right)$$
 
 ## Bandwidth and Bias--Variance Tradeoff
+As we discussed, the election of $h$ is which control the **variance-bias** trade off.  
 
-- As we discussed, the election of $h$ is which control the variance bias trade off.  
+- Small $h$: very local averaging → low bias, high variance (overfitting)
+- Large $h$: heavy smoothing → high bias, low variance (underfitting)
+- Intermediate $h$: best compromise
 
 <div style="text-align: center;">
-  <img src="nw_bandwidth_comparison.png" width="60%">
+  <img src="figures/nw_bandwidth_comparison.png" width="50%">
 </div>
 
 ## Choosing optimal $h$: 
 
-**Leave-One-Out Cross Validation**: choose $h$ such that it minimized the MISE out of sample.
+**Leave-One-Out Cross Validation**
 
 $$\text{Toy data:} \quad (x,y)=\{(1,2),(2,3),(3,2),(4,5)\}$$
 
-1. Step 1: Try bandwidth $h$.
+For a candidate bandwidth $h$:
 
-2. Step 2: remove $(1,2)$  
+1. Step 1: remove $(1,2)$  
 
   Estimate $\hat{m_{-1,h}}(1)$ using remaining three points.
 
-2. Step 3: prediction error:
+2. Step 2: prediction error:
 
   $$(2-\hat{m_{-1,h}}(1))^2$$
 
-  Repeat for all points:
+3. Step 3: Repeat for all points:
 
   $$CV(h)=\frac{1}{4}\sum_{i=1}^4 (y_i-\hat{m_{-i,h}}(x_i))^2$$
 
@@ -394,7 +408,7 @@ $$\hat{m(x_0)}=\hat{\beta_0}, \qquad \hat{m'(x_0)}=\hat{\beta_1}$$
 
 
 <div style="text-align: center;">
-  <img src="nw_vs_ll.png" width="60%">
+  <img src="figures/nw_vs_ll.png" width="40%">
 </div>
 
 
@@ -410,7 +424,7 @@ npgraph, title("Local Linear using npregress")
 3. Allows to obtain marginal effects
 
 <div style="text-align: center;">
-  <img src="npregress_plot.png" width="60%">
+  <img src="figures/npregress_plot.png" width="40%">
 </div>
 
 
@@ -439,24 +453,31 @@ House characteristics affect prices approximately **linearly**, but distance may
 
 ## Robinson Difference Estimator (PLM)
 
-A nonparametric Frisch–Waugh “partialling-out” procedure.
+*A nonparametric Frisch–Waugh “partialling-out” procedure.*
 
-
+:::{.fragment}
 1. Estimate conditional means (kernel):
-$$\hat{m_y}(\text{ldist}_i)=E(\text{lprice}_i|\text{ldist}_i)$$  
-$$\hat{m_X}(\text{ldist}_i)=E(X_i|\text{ldist}_i)$$
+$$\hat{E}[lprice|ldist_i] = \hat{m}_y(ldist_i) \quad \text{and} \quad \hat{E}[X|ldist_i] = \hat{m}_X(ldist_i)$$
+:::
 
+:::{.fragment}
 2. Partial out distance:
-$$\tilde{\text{lprice}_i}=\text{lprice}_i-\hat{m_y}(\text{ldist}_i)$$
-$$\tilde{X_i}=X_i-\hat{m_X}(\text{ldist}_i)$$
+$$\tilde{lprice}_i = lprice_i - \hat{m}_y(ldist_i) \quad \text{and} \quad \tilde{X}_i = X_i - \hat{m}_X(ldist_i)$$
+:::
 
+:::{.fragment}
 3. OLS:
-$$\tilde{y_i}=\tilde X_i'\beta+u_i$$
+$$\tilde{lprice}_i = \tilde{X}_i'\beta + u_i \quad \Rightarrow \quad \hat{\beta}_{PLM}$$
+:::
 
+:::{.fragment}
 4. Recover nonlinear effect:
 $$\hat{\lambda}(\text{ldist}_i)=\hat{m_y}(\text{ldist}_i)-\hat{m_X}(\text{ldist}_i)\hat{\beta}$$
+:::
 
+:::{.fragment}
 **Idea:** remove distance nonparametrically $\rightarrow$ estimate $\beta$ with clean variation $\rightarrow$ reconstruct $\lambda$.
+:::
 
 ## Implementation
 
@@ -504,5 +525,5 @@ semipar lprice larea lland rooms bath age if y81==1, ///
 **Non parametric part:**
 
 <div style="text-align: center;">
-  <img src="semipar.png" width="60%">
+  <img src="figures/semipar.png" width="40%">
 </div>

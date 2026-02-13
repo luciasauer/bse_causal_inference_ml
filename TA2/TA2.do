@@ -489,6 +489,10 @@ ADVANTAGES of npregress:
 4. More options (different kernels, bandwidths)
 */
 
+*Takes some time, but usefull to see that you can estimate cluster bootstraped SE
+*npregress kernel wage tenure, vce(bootstrap, reps(200))
+*npgraph, ci title("Nonparametric fit with 95% CI")
+*margins, at(tenure=(5 10 15 20)) dydx(tenure)
 
 /*==============================================================================
   Part 6: Marginal Effects (Derivative Estimation)
